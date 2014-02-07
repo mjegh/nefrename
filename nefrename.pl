@@ -23,7 +23,7 @@ use Getopt::Long;
 use Image::ExifTool qw(:Public);
 use File::Copy;                 #  to copy the original file instead of rename it
 
-my %opt = (copy => 1, nefprefix => '_DSC', keeptimes => 1, date => 1);
+my %opt = (nefprefix => '_DSC', keeptimes => 1, date => 1);
 
 GetOptions(
     'rename' => \$opt{rename},
@@ -37,6 +37,7 @@ GetOptions(
 
 die "Need a stem for the file" if !$opt{stem};
 my $nef_prefix = $opt{nefprefix};
+$opt{copy} =1 if (!defined($opt{copy}) && !defined($opt{rename}));
 
 my $cwd = getcwd;
 say "Working on dir $cwd" if $opt{verbose};
