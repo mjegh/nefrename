@@ -63,6 +63,7 @@ foreach my $img_no(sort keys %img_nos ) {
     foreach my $file(("${nef_prefix}${img_no}.JPG",
                       "${nef_prefix}${img_no}_copy.JPG",
                       "${nef_prefix}${img_no}_copy.jpg",
+                      "${nef_prefix}${img_no}_copy_resampled.jpg",
                       "${nef_prefix}${img_no}.NEF")) {
         my ($from, $to);
         $type++;
@@ -86,6 +87,9 @@ foreach my $img_no(sort keys %img_nos ) {
                 $from = "_DSC${img_no}_copy.jpg";
                 $to = "${stem}_${fileno}${sub_date}_copy.JPG";
             } elsif ($type == 4) {
+                $from = "_DSC${img_no}_copy_resampled.jpg";
+                $to = "${stem}_${fileno}${sub_date}_copy_resampled.JPG";
+            } elsif ($type == 5) {
                 $from = "_DSC${img_no}.NEF";
                 $to = "${stem}_${fileno}${sub_date}.NEF"
             } else {
