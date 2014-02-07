@@ -13,7 +13,7 @@
 # If you nef files don't start with "_DSC" you can use --nefprefix to change it.
 
 
-#use 5.016;
+use 5.016;
 use strict;
 use warnings;
 use Cwd;                        #  which dir are we in
