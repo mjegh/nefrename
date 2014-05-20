@@ -1,6 +1,6 @@
 # This is a simple script I wrote to rename my Nikon nef and jpg files
 # I've taken with my Nikon camera. The Nikon uses a file number with 4 digits
-# so it is does not take long to cycle the number. I ususually take ram (nef) and
+# so it is does not take long to cycle the number. I usually take raw (nef) and
 # jpeg shots at the same time and only switch to raw/nef only when time
 # (multiple shots) matters.
 # I also edit my raw/nef files with capture NX and write a new jpg named
@@ -10,8 +10,9 @@
 # the picture was taken (dependent on --date). If --keeptimes is set (the default)
 # and you --copy the file, it tries to keep the modified and created times
 # on the copy.
-# If you nef files don't start with "_DSC" you can use --nefprefix to change it.
-
+# If your nef files don't start with "_DSC" you can use --nefprefix to change it.
+# If you add --save-exif them it gets the MakerNotes from the EXIF data in NEF files
+# and saves them in filename.dump.
 
 use 5.016;
 use strict;
@@ -22,8 +23,9 @@ use Getopt::Long;
 # and use it in renaming the file
 use Image::ExifTool qw(:Public);
 use File::Copy;                 #  to copy the original file instead of rename it
+use Data::Dumper;
 
-my %opt = (nefprefix => '_DSC', keeptimes => 1, date => 1);
+my %opt = (nefprefix => '_DSC', keeptimes => 1, date => 1, verbose => 1);
 
 GetOptions(
     'rename' => \$opt{rename},
@@ -32,7 +34,8 @@ GetOptions(
     'date!' => \$opt{date},
     'verbose!' => \$opt{verbose},
     'nefprefix=s' => \$opt{nefprefix},
-    'keeptimes!' => \$opt{keeptimes}
+    'keeptimes!' => \$opt{keeptimes},
+    'save-exif!' => \$opt{save_exif},
 ) or die "Error in command line arguments";
 
 die "Need a stem for the file" if !$opt{stem};
@@ -70,6 +73,7 @@ foreach my $img_no(sort keys %img_nos ) {
         if (-e $file) {
             my $info = ImageInfo($file);
             my $dt = $info->{DateTimeOriginal};
+            $info = undef;
             my ($year, $month, $day);
             if ($opt{date} && $dt =~ /\A(\d{4}):(\d{2}):(\d{2})/) {
                 ($year, $month, $day) = ($1, $2, $3);
@@ -106,6 +110,17 @@ foreach my $img_no(sort keys %img_nos ) {
                     rename($from, $to ) or die "Failed to rename /$from/ to /$to/ - $!";
                 }
                 $done++;
+
+                if ($opt{save_exif} && $type == 5) {
+                    my $exifTool = new Image::ExifTool;
+                    $exifTool->Options(Group0 => ['EXIF', 'MakerNotes']);
+                    $info = $exifTool->ImageInfo($file);
+                    my $data = Dumper($info);
+                    open(my $fh, '>:encoding(UTF-8)', "$ {stem}_$ {fileno}$ {sub_date}_makernotes.dumper") or
+                        die "Failed to open exif makernotes file - $!";
+                    print $fh $data;
+                    close $fh;
+                }
             }
         }
     }
