@@ -38,9 +38,12 @@ GetOptions(
     'save-exif!' => \$opt{save_exif},
 ) or die "Error in command line arguments";
 
-die "Need a stem for the file" if !$opt{stem};
 my $nef_prefix = $opt{nefprefix};
-$opt{copy} =1 if (!defined($opt{copy}) && !defined($opt{rename}));
+if ($opt{copy} || $opt{rename}) {
+    die "Need a stem for the file" if !$opt{stem};
+} else {
+    $opt{stem} = $opt{nefprefix};
+}
 
 my $cwd = getcwd;
 say "Working on dir $cwd" if $opt{verbose};
@@ -109,7 +112,6 @@ foreach my $img_no(sort keys %img_nos ) {
                 } elsif ($opt{rename}) {
                     rename($from, $to ) or die "Failed to rename /$from/ to /$to/ - $!";
                 }
-                $done++;
 
                 if ($opt{save_exif} && $type == 5) {
                     my $exifTool = new Image::ExifTool;
@@ -121,6 +123,7 @@ foreach my $img_no(sort keys %img_nos ) {
                     print $fh $data;
                     close $fh;
                 }
+                $done++;
             }
         }
     }
