@@ -5,15 +5,20 @@
 # (multiple shots) matters.
 # I also edit my raw/nef files with capture NX and write a new jpg named
 # <ORIGINAL_FILENAME>_copy.jpg.
+#
 # This script finds all nef/jpg files (and xx_copy.jpg files) and renames/copies
 # (see --copy or --rename) them based on the --stem argument, the datetime
 # the picture was taken (dependent on --date). If --keeptimes is set (the default)
 # and you --copy the file, it tries to keep the modified and created times
 # on the copy.
-# If your nef files don't start with "_DSC" you can use --nefprefix to change it.
-# If you add --save-exif them it gets the MakerNotes from the EXIF data in NEF files
+#
+# If your nef files don't start with "DSC_" you can use --nefprefix to change it.
+# If you add --save-exif then it gets the MakerNotes from the EXIF data in NEF files
 # and saves them in filename.dump.
-
+#
+# If --creator specified (the default) then the exif data is updated in the new (or replaced file)
+# with the contents of %new_exif (see below).
+#
 use 5.016;
 use strict;
 use warnings;
@@ -25,7 +30,15 @@ use Image::ExifTool qw(:Public);
 use File::Copy;                 #  to copy the original file instead of rename it
 use Data::Dumper;
 
-my %opt = (nefprefix => '_DSC', keeptimes => 1, date => 1, verbose => 1);
+my %new_exif = (
+    UsageTerms => 'No reuse without permission');
+
+my %opt = (
+    nefprefix => 'DSC_',
+    keeptimes => 1,
+    date => 1,
+    creator => 1,
+    verbose => 1);
 
 GetOptions(
     'rename' => \$opt{rename},
@@ -36,6 +49,7 @@ GetOptions(
     'nefprefix=s' => \$opt{nefprefix},
     'keeptimes!' => \$opt{keeptimes},
     'save-exif!' => \$opt{save_exif},
+    'creator' => \$opt{creator},
 ) or die "Error in command line arguments";
 
 my $nef_prefix = $opt{nefprefix};
@@ -85,19 +99,19 @@ foreach my $img_no(sort keys %img_nos ) {
             }
             my $sub_date = ($opt{date} ? "_${year}_${month}_${day}" : '');
             if ($type == 1) {
-                $from = "_DSC${img_no}.JPG";
+                $from = "${nef_prefix}${img_no}.JPG";
                 $to = "${stem}_${fileno}${sub_date}.JPG";
             } elsif ($type == 2) {
-                $from = "_DSC${img_no}_copy.JPG";
+                $from = "$ {nef_prefix}${img_no}_copy.JPG";
                 $to = "${stem}_${fileno}${sub_date}_copy.JPG";
             } elsif ($type == 3) {
-                $from = "_DSC${img_no}_copy.jpg";
+                $from = "${nef_prefix}${img_no}_copy.jpg";
                 $to = "${stem}_${fileno}${sub_date}_copy.JPG";
             } elsif ($type == 4) {
-                $from = "_DSC${img_no}_copy_resampled.jpg";
+                $from = "${nef_prefix}${img_no}_copy_resampled.jpg";
                 $to = "${stem}_${fileno}${sub_date}_copy_resampled.JPG";
             } elsif ($type == 5) {
-                $from = "_DSC${img_no}.NEF";
+                $from = "$ {nef_prefix}${img_no}.NEF";
                 $to = "${stem}_${fileno}${sub_date}.NEF"
             } else {
                 die "how did we get here";
@@ -105,12 +119,33 @@ foreach my $img_no(sort keys %img_nos ) {
             my @stat = stat($file);
             #say "atime = ", $stat[8], ", mtime = ", $stat[9];
             if ($from) {
-                say "$from => $to";
+                say "$from => $to" if $opt{verbose};
+
+                my $et;
+                if ($opt{creator}) {
+                    $et = new Image::ExifTool;
+                    unless ($et->ExtractInfo($from)) {
+                        say "Failed to extract info from $from";
+                        exit 1;
+                    };
+                    foreach (keys %new_exif) {
+                        $et->SetNewValue($_, $new_exif{$_});
+                    }
+                }
+
                 if ($opt{copy}) {
-                    copy($from, $to ) or die "Failed to copy /$from/ to /$to/ - $!";
+                    if ($opt{creator}) {
+                        write_file_with_exif($et, $from, $to);
+                    } else {
+                        copy($from, $to ) or die "Failed to copy /$from/ to /$to/ - $!";
+                    }
                     utime($stat[8], $stat[9], $to) if $opt{keeptimes};
                 } elsif ($opt{rename}) {
-                    rename($from, $to ) or die "Failed to rename /$from/ to /$to/ - $!";
+                    if ($opt{creator}) {
+                        $et->write_file_with_exif($et, $from);
+                    } else {
+                        rename($from, $to ) or die "Failed to rename /$from/ to /$to/ - $!";
+                    }
                 }
 
                 if ($opt{save_exif} && $type == 5) {
@@ -128,4 +163,20 @@ foreach my $img_no(sort keys %img_nos ) {
         }
     }
     $fileno++ if $done;
+}
+
+
+
+sub write_file_with_exif {
+    my ($et, $from, $to) = @_;
+
+    my $written = $et->WriteInfo($from, $to);
+    if ($written == 2) {
+        warn("--creator and no changes were made on $from");
+    } elsif (!$written) {
+        my $error = $et->GetValue('Error');
+        my $warning = $et->GetValue('Warning');
+        warn("Warning writing $to from $from - $warning") if $warning;
+        die("Error writing $to from $from - $error") if $error;
+    }
 }
