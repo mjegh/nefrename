@@ -124,6 +124,7 @@ foreach my $img_no(sort keys %img_nos ) {
                 my $et;
                 if ($opt{creator}) {
                     $et = new Image::ExifTool;
+                    $et->Options(Unknown => 1);
                     unless ($et->ExtractInfo($from)) {
                         say "Failed to extract info from $from";
                         exit 1;
